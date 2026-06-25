@@ -50,18 +50,6 @@ jobs:
             goarch: amd64
             ext: .exe
             tag_file: release/DEFAULT_BUILD_TAGS_WINDOWS
-          - name: linux-amd64
-            runner: ubuntu-latest
-            goos: linux
-            goarch: amd64
-            ext: ""
-            tag_file: release/DEFAULT_BUILD_TAGS
-          - name: linux-arm64
-            runner: ubuntu-latest
-            goos: linux
-            goarch: arm64
-            ext: ""
-            tag_file: release/DEFAULT_BUILD_TAGS
           - name: darwin-amd64
             runner: macos-latest
             goos: darwin
