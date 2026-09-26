@@ -1,0 +1,62 @@
+# Fork-only verification. Do not include this workflow in the upstream fix.
+name: Verify clean V2Ray upgrade fix
+
+on:
+  push:
+    branches:
+      - codex/verify-v2ray-upgrade-cleanup-20260927
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-v2ray-upgrade-cleanup-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Targeted tests (${{ matrix.os }}, Go ${{ matrix.go }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        go: ['1.25.5', '1.26.x']
+    steps:
+      - name: Checkout exact clean fix, not the verification commit
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          ref: 33075e95aa284751bf60e171c255461f32174b14
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Check formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(gofmt -l transport/v2rayhttpupgrade/client.go transport/v2rayhttpupgrade/client_test.go transport/v2raywebsocket/client_test.go)"
+      - name: Race and repeated targeted tests
+        shell: bash
+        run: go test -race -count=20 -timeout=120s ./transport/v2rayhttpupgrade ./transport/v2raywebsocket
+      - name: Vet targeted packages
+        shell: bash
+        run: go vet ./transport/v2rayhttpupgrade ./transport/v2raywebsocket
+      - name: Verify the no-drain regression detects the upstream baseline
+        if: matrix.os == 'ubuntu-latest' && matrix.go == '1.26.x'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git show 132b38e9caaba1a1959354d518e54d2d08419afe:transport/v2rayhttpupgrade/client.go > transport/v2rayhttpupgrade/client.go
+          set +e
+          go test -count=1 -timeout=30s -run 'TestClientUpgradeConnectionCleanup/rejected_' ./transport/v2rayhttpupgrade > baseline-test.log 2>&1
+          result=$?
+          set -e
+          cat baseline-test.log
+          git restore transport/v2rayhttpupgrade/client.go
+          test "$result" -ne 0
+          grep -q 'attempted to drain the rejected response after closing' baseline-test.log
