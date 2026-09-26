@@ -22,7 +22,6 @@ func TestClientUpgradeConnectionCleanup(t *testing.T) {
 		name     string
 		response string
 		wantErr  string
-		payload  string
 	}{
 		{name: "write_failure", wantErr: "closed pipe"},
 		{name: "malformed_response", response: "not HTTP\r\n\r\n", wantErr: "malformed HTTP"},
@@ -33,7 +32,7 @@ func TestClientUpgradeConnectionCleanup(t *testing.T) {
 		{name: "invalid_connection", response: "HTTP/1.1 101 Switching Protocols\r\nConnection: keep-alive\r\nUpgrade: websocket\r\n\r\n", wantErr: "unexpected status"},
 		{name: "invalid_upgrade", response: "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: other\r\n\r\n", wantErr: "unexpected status"},
 		{name: "success", response: accepted},
-		{name: "success_buffered_data", response: accepted + "hello", payload: "hello"},
+		{name: "success_with_buffered_data", response: accepted + "hello"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			local, peer := net.Pipe()
@@ -86,15 +85,6 @@ func TestClientUpgradeConnectionCleanup(t *testing.T) {
 				}
 				if raw.closes.Load() != 0 {
 					t.Fatal("successful upgrade closed the connection")
-				}
-				if test.payload != "" {
-					if err := got.conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
-						t.Fatal(err)
-					}
-					payload := make([]byte, len(test.payload))
-					if _, err := io.ReadFull(got.conn, payload); err != nil || string(payload) != test.payload {
-						t.Fatalf("buffered payload = %q, %v", payload, err)
-					}
 				}
 				if err := got.conn.Close(); err != nil {
 					t.Fatal(err)

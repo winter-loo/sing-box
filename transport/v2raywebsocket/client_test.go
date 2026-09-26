@@ -64,6 +64,10 @@ func TestClientUpgradeConnectionCleanup(t *testing.T) {
 							response = "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Accept: " + base64.StdEncoding.EncodeToString(accept[:]) + "\r\n\r\n"
 						}
 						_, err = io.WriteString(peer, response)
+						if err == nil && test.name == "success" {
+							// Receive the close frame; net.Pipe writes are synchronous.
+							_, err = io.Copy(io.Discard, peer)
+						}
 						serverDone <- err
 					}()
 					type result struct {
