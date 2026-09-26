@@ -24,11 +24,14 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         go: ['1.25.5', '1.26.x']
     steps:
+      - name: Preserve committed line endings on all runners
+        shell: bash
+        run: git config --global core.autocrlf false
       - name: Checkout exact clean fix, not the verification commit
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
-          ref: 33075e95aa284751bf60e171c255461f32174b14
-          fetch-depth: 2
+          ref: 30c08123aec879c7f97bda8f18af0a8cff13cef0
+          fetch-depth: 3
           persist-credentials: false
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -38,10 +41,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -z "$(gofmt -l transport/v2rayhttpupgrade/client.go transport/v2rayhttpupgrade/client_test.go transport/v2raywebsocket/client_test.go)"
+          files=(transport/v2rayhttpupgrade/client.go transport/v2rayhttpupgrade/client_test.go transport/v2raywebsocket/client_test.go)
+          unformatted=$(gofmt -l "${files[@]}")
+          if test -n "$unformatted"; then
+            printf '%s\n' "$unformatted"
+            gofmt -d "${files[@]}"
+            exit 1
+          fi
       - name: Race and repeated targeted tests
         shell: bash
-        run: go test -race -count=20 -timeout=120s ./transport/v2rayhttpupgrade ./transport/v2raywebsocket
+        run: |
+          go version
+          go test -race -count=20 -timeout=120s ./transport/v2rayhttpupgrade ./transport/v2raywebsocket
       - name: Vet targeted packages
         shell: bash
         run: go vet ./transport/v2rayhttpupgrade ./transport/v2raywebsocket
